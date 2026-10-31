@@ -23,7 +23,7 @@ jobs:
         uses: aormsby/Fork-Sync-With-Upstream-action@v3.4.1   # check for latest tag
         with:
           target_sync_branch: main            # or master / your default branch
-          upstream_sync_repo: ORIGINAL_OWNER/ORIGINAL_REPO
+          upstream_sync_repo: kitbyte/wand-enhancer
           upstream_sync_branch: main          # upstream’s default branch
           target_repo_token: ${{ secrets.GITHUB_TOKEN }}
           # upstream_repo_access_token: ${{ secrets.UPSTREAM_TOKEN }}  # only if upstream is private
