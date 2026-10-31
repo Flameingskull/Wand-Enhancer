@@ -1,0 +1,29 @@
+name: Sync with Upstream
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # every day at 06:00 UTC (adjust as needed)
+  workflow_dispatch:       # allow manual runs
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}   # or a PAT with repo scope if needed
+
+      - name: Sync with upstream
+        id: sync
+        uses: aormsby/Fork-Sync-With-Upstream-action@v3.4.1   # check for latest tag
+        with:
+          target_sync_branch: main            # or master / your default branch
+          upstream_sync_repo: ORIGINAL_OWNER/ORIGINAL_REPO
+          upstream_sync_branch: main          # upstream’s default branch
+          target_repo_token: ${{ secrets.GITHUB_TOKEN }}
+          # upstream_repo_access_token: ${{ secrets.UPSTREAM_TOKEN }}  # only if upstream is private
