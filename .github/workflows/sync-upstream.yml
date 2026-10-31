@@ -2,8 +2,8 @@ name: Sync with Upstream
 
 on:
   schedule:
-    - cron: '0 6 * * *'   # every day at 06:00 UTC (adjust as needed)
-  workflow_dispatch:       # allow manual runs
+    - cron: '0 6 * * *'          # daily 06:00 UTC
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -16,14 +16,18 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}   # or a PAT with repo scope if needed
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Sync with upstream
-        id: sync
-        uses: aormsby/Fork-Sync-With-Upstream-action@v3.4.1   # check for latest tag
-        with:
-          target_sync_branch: main            # or master / your default branch
-          upstream_sync_repo: kitbyte/wand-enhancer
-          upstream_sync_branch: main          # upstream’s default branch
-          target_repo_token: ${{ secrets.GITHUB_TOKEN }}
-          # upstream_repo_access_token: ${{ secrets.UPSTREAM_TOKEN }}  # only if upstream is private
+      - name: Sync master + tags from upstream
+        run: |
+          git remote add upstream https://github.com/k1tbyte/Wand-Enhancer.git || true
+          git fetch upstream --tags --force
+
+          git checkout master
+          git merge --ff-only upstream/master || {
+            echo "Fast-forward failed (local commits on master). Skipping."
+            exit 0
+          }
+
+          git push origin master
+          git push origin --tags --force
