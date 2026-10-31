@@ -2,7 +2,7 @@ name: Sync with Upstream
 
 on:
   schedule:
-    - cron: '0 6 * * *'          # daily 06:00 UTC
+    - cron: '0 6 * * *'
   workflow_dispatch:
 
 permissions:
@@ -13,21 +13,58 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Sync master + tags from upstream
+      - name: Sync upstream while preserving local workflows
         run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Remember which files we want to keep
+          LOCAL_WORKFLOWS=".github/workflows"
+
           git remote add upstream https://github.com/k1tbyte/Wand-Enhancer.git || true
           git fetch upstream --tags --force
 
-          git checkout master
-          git merge --ff-only upstream/master || {
-            echo "Fast-forward failed (local commits on master). Skipping."
-            exit 0
-          }
+          DEFAULT_BRANCH=$(git remote show origin | sed -n '/HEAD branch/s/.*: //p')
+          echo "Default branch: $DEFAULT_BRANCH"
 
-          git push origin master
+          # Make sure we are on the default branch
+          git checkout "$DEFAULT_BRANCH"
+
+          # Save a copy of our local workflow files
+          mkdir -p /tmp/local-workflows
+          cp -r "$LOCAL_WORKFLOWS"/* /tmp/local-workflows/ 2>/dev/null || true
+
+          # Merge upstream (creates a merge commit if needed)
+          # This brings in all new upstream commits while keeping our history
+          if ! git merge --no-edit "upstream/$DEFAULT_BRANCH"; then
+            echo "Merge conflict detected. Attempting to resolve by keeping our workflow files..."
+            # In case of conflict, prefer our workflow files
+            git checkout --ours "$LOCAL_WORKFLOWS" || true
+            git add "$LOCAL_WORKFLOWS" || true
+            git commit -m "Merge upstream/$DEFAULT_BRANCH (kept local workflows)" || true
+          fi
+
+          # Restore our workflow files in case upstream ever ships its own
+          mkdir -p "$LOCAL_WORKFLOWS"
+          cp -r /tmp/local-workflows/* "$LOCAL_WORKFLOWS/" 2>/dev/null || true
+
+          # Commit the restored workflows if they changed
+          if ! git diff --quiet "$LOCAL_WORKFLOWS"; then
+            git add "$LOCAL_WORKFLOWS"
+            git commit -m "chore: restore local automation workflows after upstream sync" || true
+          fi
+
+          # Push the branch
+          git push origin "$DEFAULT_BRANCH"
+
+          # Push tags (this is what triggers the release workflow)
           git push origin --tags --force
+
+          echo "Sync finished. Local workflows preserved."
